@@ -1,7 +1,14 @@
 import pandas as pd
 import pdfplumber
 import re
+import camelot
+import os
+import json
+import urllib.request
+from pprint import pprint
 
+import argparse
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 schedule_pdf = pdfplumber.open('schedule30.pdf')
 teachers_pdf = pdfplumber.open('teachers30.pdf')
@@ -12,7 +19,113 @@ teachers_pages = teachers_pdf.pages
 teachers_list = []
 teacher_pattern = re.compile(r'\s*\.*\s*[A-ZА-ЯЁ][a-zа-яё]+\s+[A-ZА-ЯЁ][.]\s*[A-ZА-ЯЁ][.]\s*\.*\s*')
 groups_list = []
-group_pattern = re.compile(r'\s*\.*\s*(^[А-Я]{1,3}-\d{3}(,\s\d{3})*$)|(^[А-Я]-\d{6}-\d[а-я]-\d{2}\/\d$)\s*\.*\s*')
+group_pattern = re.compile(r'\s*\.*\s*(^[А-Я]{1,3}-\d{3}(,\s*\d{3})*$)|(^[А-Я]-\d{6}-\d[а-я]-\d{2}\/\d$)\s*\.*\s*')
+
+for page in teachers_pages:
+    words = page.extract_words(use_text_flow=True, keep_blank_chars=True)
+    teachers_list += [x['text'] for x in words if teacher_pattern.match(x['text'])]
+teachers_list.sort()
+teachers_list = list(dict.fromkeys(teachers_list))  # remove duplicates
+
+
+for page in schedule_pages:
+    words = page.extract_words(use_text_flow=True, keep_blank_chars=True)
+    groups_list += [x['text'] for x in words if group_pattern.match(x['text'])]
+groups_list.sort()
+groups_list = list(dict.fromkeys(groups_list))
+
+'''
+def to_json(self, path, **kwargs):
+
+    json_string = self.df.to_json(**kwargs).replace("\\/", "/").encode().decode('unicode_escape').replace('\n', ' ')
+    #pattern_before = re.compile("\.+\s+\"[A-Za-zА-Яа-яЁё]+\.+")
+    #pattern_after = re.compile("[A-Za-zА-Яа-яЁё]")
+    json_string = json_string.replace('"Оператор электронно- вычислительных и  406 вычислительных  машин"', 'Оператор электронно-вычислительных и  406 вычислительных  машин')
+    #re.sub(pattern, '', json_string)
+
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write(json_string)
+
+
+
+camelot.core.Table.to_json = to_json
+tables = camelot.io.read_pdf('schedule30.pdf', pages='all', encoding='utf-8')
+
+output_path = "bar.json"
+tables.export('bar.json', f='json')
+'''
+
+# with open('bar-page-1-table-1.json', 'r', encoding='utf-8') as read_json:
+#    data = json.load(read_json)
+
+#pprint(data)
+
+
+'''
+headers = {
+    "Content-Type": "application/json",
+    "Accept": "application/json",
+}
+
+
+# base_path = os.path.dirname(__file__)
+
+
+class S(BaseHTTPRequestHandler):
+    def _set_headers(self, code, location, header_type):
+        self.send_response(code)
+        self.send_header(location, header_type)
+        self.end_headers()
+
+    def do_GET(self):
+        res = json.dumps()
+        # self._set_headers(200, "Content-type", "application/json")
+        return res
+
+        track_name = 'tracks\\' + self.path.replace('/', '') + '.mp3'
+        if os.path.exists(track_name):
+            print(f'[get] path: {base_path}\\{track_name}')
+            self._set_headers(200, "Content-type", "application/octet-stream")
+            with open(os.path.join(base_path, track_name), 'rb') as track_bytes:
+                self.wfile.write(track_bytes.read())
+
+    def do_POST(self):
+        self._set_headers(302, "Location", "https://google.com/")
+
+
+def run(server_class=HTTPServer, handler_class=S, addr="localhost", port=1337):
+    server_address = (addr, port)
+    httpd = server_class(server_address, handler_class)
+    print(f"[MGKIT] server works at: {addr}:{port}")
+    httpd.serve_forever()
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-l",
+        "--listen",
+        default="localhost",
+        help="Specify the IP address on which the server listens",
+    )
+    parser.add_argument(
+        "-p",
+        "--port",
+        type=int,
+        default=1337,
+        help="Specify the port on which the server listens",
+    )
+    args = parser.parse_args()
+    run(addr=args.listen, port=args.port)
+'''
+
+schedule_pages = schedule_pdf.pages
+teachers_pages = teachers_pdf.pages
+
+teachers_list = []
+teacher_pattern = re.compile(r'\s*\.*\s*[A-ZА-ЯЁ][a-zа-яё]+\s+[A-ZА-ЯЁ][.]\s*[A-ZА-ЯЁ][.]\s*\.*\s*')
+groups_list = []
+group_pattern = re.compile(r'\s*\.*\s*(^[А-Я]{1,3}-\d{3}(,\s*\d{3})*$)|(^[А-Я]-\d{6}-\d[а-я]-\d{2}\/\d$)\s*\.*\s*')
 
 for page in teachers_pages:
     words = page.extract_words(use_text_flow=True, keep_blank_chars=True)
@@ -96,21 +209,94 @@ for page_i, page in enumerate(schedule_pages):
                     # TODO: загрузить элементы из overflow в их законные клетки
                 row_cells.append(cell_words)
             schedule_table.append(row_cells)
+#schedule_df = pd.DataFrame(schedule_table[3:])
 schedule_df = pd.DataFrame(schedule_table[3:])
-
+schedule_df = schedule_df.loc[:, ~schedule_df.columns.isin([0, 1])]
+#print(schedule_df)
 pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', None)
 pd.set_option('display.max_colwidth', None)
 
-print(schedule_df)
-path = "__result.csv"
 '''
+# print(schedule_df)
+path = "__result.csv"
+
 while True:
     try:
-        schedule_df.to_csv(path)
+        # schedule_df.to_csv(path)
+        # json_string = self.df.to_json(**kwargs).replace("\\/", "/").encode().decode('unicode_escape').replace('\n', ' ')
+        json_string = schedule_df.to_json(orient='columns').replace("\\/", "/").encode().decode('unicode_escape').replace('\n', ' ')
+        json_string = json_string.replace('"Оператор электронно-вычислительных и вычислительных машин"', 'Оператор электронно-вычислительных и вычислительных машин')
+
+        # parsed = json.loads(json_string)
+        # print('\n'+parsed)
+        # print(json.dumps(parsed, indent=4))
+
+        #json_loaded = json.loads(json_string)
+        #print(pd.json_normalize(json_loaded))
+        print('\n'+json_string)
         break
     except PermissionError:
         path = "_" + path
         pass
 '''
+
+json_string = schedule_df.to_json(orient='columns').replace("\\/", "/").encode().decode('unicode_escape').replace('\n', ' ')
+json_string = json_string.replace('"Оператор электронно-вычислительных и вычислительных машин"', 'Оператор электронно-вычислительных и вычислительных машин')
+
+print('\n'+json_string)
+
+
+class S(BaseHTTPRequestHandler):
+    def _set_headers(self, code, location, header_type):
+        self.send_response(code)
+        self.send_header(location, header_type)
+        self.end_headers()
+
+    def do_GET(self):
+        res = json.dumps(json_string)
+        # self._set_headers(200, "Content-type", "application/json")
+        return res
+
+        track_name = 'tracks\\' + self.path.replace('/', '') + '.mp3'
+        if os.path.exists(track_name):
+            print(f'[get] path: {base_path}\\{track_name}')
+            self._set_headers(200, "Content-type", "application/octet-stream")
+            with open(os.path.join(base_path, track_name), 'rb') as track_bytes:
+                self.wfile.write(track_bytes.read())
+
+    def do_POST(self):
+        self._set_headers(302, "Location", "https://google.com/")
+
+
+def run(server_class=HTTPServer, handler_class=S, addr="localhost", port=1337):
+    server_address = (addr, port)
+    httpd = server_class(server_address, handler_class)
+    print(f"[MGKIT] server works at: {addr}:{port}")
+    httpd.serve_forever()
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-l",
+        "--listen",
+        default="localhost",
+        help="Specify the IP address on which the server listens",
+    )
+    parser.add_argument(
+        "-p",
+        "--port",
+        type=int,
+        default=1337,
+        help="Specify the port on which the server listens",
+    )
+    args = parser.parse_args()
+    run(addr=args.listen, port=args.port)
+
+
+
+
+
+
