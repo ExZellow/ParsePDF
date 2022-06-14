@@ -9,6 +9,30 @@ from pprint import pprint
 import ipdb
 import argparse
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from bs4 import BeautifulSoup
+import requests
+
+headers = {
+    "user-agent": ""
+}
+
+def getActualSchedule():
+    url = "https://sites.google.com/a/mgkit.ru/www/studentu/raspisanie-zanatij"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 schedule_pdf = pdfplumber.open('schedule0706.pdf')  # pdfplumber.open('schedule30.pdf')
@@ -152,7 +176,7 @@ class S(BaseHTTPRequestHandler):
 
     def do_GET(self):
         self._set_headers(200, "Content-type", "application/json")
-        return json_string
+        self.wfile.write(bytes(json.dumps(json_string), 'utf-8'))
 
     def do_POST(self):
         self._set_headers(302, "Location", "https://google.com/")
